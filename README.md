@@ -33,6 +33,26 @@ inputs.cookbook.url = "github:jkeifer/homebrew-cookbook";
 
 Shell completions (bash/zsh/fish) are installed automatically by both channels.
 
+### home-manager
+
+The flake exposes `homeManagerModules.default` (alias `homeManagerModules.gribe`),
+which installs the package and — because a Claude Code skill can't be activated from a
+Nix profile, only from `~/.claude/skills/` — links gribe's embedded skill there:
+
+```nix
+# flake.nix inputs: cookbook.url = "github:jkeifer/homebrew-cookbook";
+# in your home-manager configuration:
+imports = [ inputs.cookbook.homeManagerModules.default ];
+
+programs.gribe.enable = true;
+# programs.gribe.installSkill = false;   # opt out of ~/.claude/skills/transgribe/SKILL.md
+# programs.gribe.package = ...;          # override the package
+```
+
+Without home-manager, the skill still ships inside the binary — run `gribe skill install`
+to place it imperatively. The package also exposes it at
+`<gribe>/share/transgribe/SKILL.md`.
+
 ### Browser downloads
 
 If you download a tool's binary directly from its GitHub releases page (not via Nix

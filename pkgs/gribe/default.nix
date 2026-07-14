@@ -23,6 +23,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       --bash <($out/bin/gribe --generate-completion-script bash) \
       --zsh  <($out/bin/gribe --generate-completion-script zsh) \
       --fish <($out/bin/gribe --generate-completion-script fish)
+    # Emit the embedded Claude Code skill as a stable artifact (no models or
+    # network needed — `skill print` just dumps embedded markdown). The
+    # home-manager module links this into ~/.claude/skills.
+    mkdir -p $out/share/transgribe
+    $out/bin/gribe skill print > $out/share/transgribe/SKILL.md
     runHook postInstall
   '';
 
