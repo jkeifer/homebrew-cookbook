@@ -47,7 +47,20 @@ imports = [ inputs.cookbook.homeManagerModules.default ];
 programs.gribe.enable = true;
 # programs.gribe.installSkill = false;   # opt out of ~/.claude/skills/transgribe/SKILL.md
 # programs.gribe.package = ...;          # override the package
+
+# Declaratively manage ~/.config/transgribe/config:
+programs.gribe.settings = {
+  default-model = "parakeet-v3";
+  default-language = "en";
+  default-include-markup = false;
+};
 ```
+
+Setting `settings` makes home-manager own `~/.config/transgribe/config` (a read-only
+store symlink), so `gribe config set`/`unset` will fail — manage it here, or leave
+`settings` empty to keep using `gribe config` imperatively. See `gribe config keys` for
+valid keys/values (Nix does not validate them). Note: `settings` only takes effect on a
+gribe release that includes the `config` command.
 
 Without home-manager, the skill still ships inside the binary — run `gribe skill install`
 to place it imperatively. The package also exposes it at

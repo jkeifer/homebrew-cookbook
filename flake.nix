@@ -12,6 +12,11 @@
       gribeModule = { config, lib, ... }:
         let
           cfg = config.programs.gribe;
+          renderValue = v: if lib.isBool v then (if v then "true" else "false") else toString v;
+          # git-config style flat "key = value" file, matching gribe's own serializer.
+          configText = lib.concatStrings (
+            lib.mapAttrsToList (k: v: "${k} = ${renderValue v}\n") cfg.settings
+          );
         in
         {
           options.programs.gribe = {
@@ -32,6 +37,33 @@
                 ~/.claude/skills/transgribe/SKILL.md.
               '';
             };
+
+            settings = lib.mkOption {
+              type = lib.types.attrsOf (lib.types.either lib.types.str lib.types.bool);
+              default = { };
+              example = lib.literalExpression ''
+                {
+                  default-model = "parakeet-v3";
+                  default-language = "en";
+                  default-format = "json";
+                  default-include-markup = false;
+                }
+              '';
+              description = ''
+                Declarative contents of gribe's config file
+                (`$XDG_CONFIG_HOME/transgribe/config`, git-config style
+                `key = value`).
+
+                When this is non-empty, home-manager owns the file and it becomes
+                a read-only store symlink, so `gribe config set`/`unset` will fail
+                — manage configuration here instead. Leave it empty to keep the
+                file mutable and use `gribe config` imperatively.
+
+                Values are written verbatim (booleans as `true`/`false`) and are
+                NOT validated by Nix; run `gribe config keys` for the valid keys
+                and allowed values.
+              '';
+            };
           };
 
           config = lib.mkIf cfg.enable {
@@ -39,6 +71,10 @@
 
             home.file.".claude/skills/transgribe/SKILL.md" = lib.mkIf cfg.installSkill {
               source = "${cfg.package}/share/transgribe/SKILL.md";
+            };
+
+            xdg.configFile."transgribe/config" = lib.mkIf (cfg.settings != { }) {
+              text = configText;
             };
           };
         };
