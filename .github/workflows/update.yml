@@ -24,10 +24,13 @@ jobs:
 
       - name: Resolve inputs
         id: vars
+        env:
+          RAW_TOOL: ${{ github.event.inputs.tool || github.event.client_payload.tool }}
+          RAW_TAG: ${{ github.event.inputs.tag || github.event.client_payload.tag }}
         run: |
           set -euo pipefail
-          TOOL="${{ github.event.inputs.tool || github.event.client_payload.tool }}"
-          TAG="${{ github.event.inputs.tag || github.event.client_payload.tag }}"
+          TOOL="$RAW_TOOL"
+          TAG="$RAW_TAG"
           if [ -z "$TOOL" ] || [ -z "$TAG" ]; then
             echo "tool and tag are required" >&2
             exit 1
