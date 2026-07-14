@@ -1,0 +1,78 @@
+name: Update tool
+
+on:
+  repository_dispatch:
+    types: [update-tool]
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: "Tool name (e.g. gribe)"
+        required: true
+      tag:
+        description: "Release tag (e.g. v0.1.2)"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve inputs
+        id: vars
+        run: |
+          set -euo pipefail
+          TOOL="${{ github.event.inputs.tool || github.event.client_payload.tool }}"
+          TAG="${{ github.event.inputs.tag || github.event.client_payload.tag }}"
+          if [ -z "$TOOL" ] || [ -z "$TAG" ]; then
+            echo "tool and tag are required" >&2
+            exit 1
+          fi
+          {
+            echo "tool=$TOOL"
+            echo "tag=$TAG"
+            echo "version=${TAG#v}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Recompute hashes and rewrite pins
+        env:
+          TOOL: ${{ steps.vars.outputs.tool }}
+          TAG: ${{ steps.vars.outputs.tag }}
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          set -euo pipefail
+          SRC="pkgs/$TOOL/source.json"
+          FORMULA="Formula/$TOOL.rb"
+          REPO=$(jq -r '.repo' "$SRC")
+          ASSET=$(jq -r '.asset' "$SRC")
+          URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
+
+          curl -fsSL -o "$ASSET" "$URL"
+          HEX=$(shasum -a 256 "$ASSET" | awk '{print $1}')
+          SRI="sha256-$(openssl dgst -sha256 -binary "$ASSET" | openssl base64 -A)"
+
+          jq --arg v "$VERSION" --arg s "$SRI" '.version=$v | .sha256=$s' "$SRC" > "$SRC.tmp"
+          mv "$SRC.tmp" "$SRC"
+
+          sed -i -E \
+            -e "s#/releases/download/[^/\"]*/$ASSET#/releases/download/$TAG/$ASSET#" \
+            -e "s#^  version \"[^\"]+\"#  version \"$VERSION\"#" \
+            -e "s#^  sha256 \"[0-9a-f]+\"#  sha256 \"$HEX\"#" \
+            "$FORMULA"
+
+          rm -f "$ASSET"
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: bump/${{ steps.vars.outputs.tool }}-${{ steps.vars.outputs.version }}
+          title: "bump: ${{ steps.vars.outputs.tool }} ${{ steps.vars.outputs.version }}"
+          commit-message: "bump: ${{ steps.vars.outputs.tool }} ${{ steps.vars.outputs.version }}"
+          body: "Automated bump of ${{ steps.vars.outputs.tool }} to ${{ steps.vars.outputs.tag }}."
+          add-paths: |
+            pkgs/${{ steps.vars.outputs.tool }}/source.json
+            Formula/${{ steps.vars.outputs.tool }}.rb
