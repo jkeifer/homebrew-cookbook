@@ -51,5 +51,10 @@ the flake, and a matching `Formula/<tool>.rb` for Homebrew.
 
 Bumps are automated: when a tool publishes a GitHub release, its CI sends a
 `repository_dispatch` to this repo, and `.github/workflows/update.yml` recomputes the
-hashes and opens a PR. You can also bump manually from the Actions tab
+hashes, **validates the flake still builds** (`nix build` on an arm64 macOS runner —
+so a broken or renamed release binary can't land), and commits the bump straight to
+`main`. You can also bump manually from the Actions tab
 ("Update tool" → Run workflow → tool + tag).
+
+If `main` is protected against direct pushes, the workflow's push will fail — either
+allow the `github-actions` bot to push, or switch the final step back to opening a PR.

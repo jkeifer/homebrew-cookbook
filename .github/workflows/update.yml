@@ -14,13 +14,19 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   bump:
-    runs-on: ubuntu-latest
+    # arm64 macOS: required to run gribe's aarch64-only binary during the
+    # flake build (completion generation runs it) and to validate the pin.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
       - name: Resolve inputs
         id: vars
@@ -61,7 +67,8 @@ jobs:
           jq --arg v "$VERSION" --arg s "$SRI" '.version=$v | .sha256=$s' "$SRC" > "$SRC.tmp"
           mv "$SRC.tmp" "$SRC"
 
-          sed -i -E \
+          # BSD sed (macOS runner): -i requires a backup-suffix argument.
+          sed -i '' -E \
             -e "s#/releases/download/[^/\"]*/$ASSET#/releases/download/$TAG/$ASSET#" \
             -e "s#^  version \"[^\"]+\"#  version \"$VERSION\"#" \
             -e "s#^  sha256 \"[0-9a-f]+\"#  sha256 \"$HEX\"#" \
@@ -69,13 +76,27 @@ jobs:
 
           rm -f "$ASSET"
 
-      - name: Open pull request
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
-        with:
-          branch: bump/${{ steps.vars.outputs.tool }}-${{ steps.vars.outputs.version }}
-          title: "bump: ${{ steps.vars.outputs.tool }} ${{ steps.vars.outputs.version }}"
-          commit-message: "bump: ${{ steps.vars.outputs.tool }} ${{ steps.vars.outputs.version }}"
-          body: "Automated bump of ${{ steps.vars.outputs.tool }} to ${{ steps.vars.outputs.tag }}."
-          add-paths: |
-            pkgs/${{ steps.vars.outputs.tool }}/source.json
-            Formula/${{ steps.vars.outputs.tool }}.rb
+      - name: Validate flake build
+        env:
+          TOOL: ${{ steps.vars.outputs.tool }}
+        run: |
+          set -euo pipefail
+          # Stage the rewritten pins so the flake evaluation sees them.
+          git add "pkgs/$TOOL/source.json" "Formula/$TOOL.rb"
+          nix build ".#$TOOL" --print-build-logs
+          "./result/bin/$TOOL" version
+
+      - name: Commit bump to main
+        env:
+          TOOL: ${{ steps.vars.outputs.tool }}
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git diff --cached --quiet; then
+            echo "No pin changes — already up to date; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "bump: $TOOL $VERSION"
+          git push origin HEAD:main
