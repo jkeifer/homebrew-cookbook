@@ -31,7 +31,7 @@
 
             installSkill = lib.mkOption {
               type = lib.types.bool;
-              default = true;
+              default = false;
               description = ''
                 Link the embedded transgribe Claude Code skill into
                 ~/.claude/skills/transgribe/SKILL.md.

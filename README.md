@@ -35,9 +35,11 @@ Shell completions (bash/zsh/fish) are installed automatically by both channels.
 
 ### home-manager
 
-The flake exposes `homeManagerModules.default` (alias `homeManagerModules.gribe`),
-which installs the package and — because a Claude Code skill can't be activated from a
-Nix profile, only from `~/.claude/skills/` — links gribe's embedded skill there:
+The flake exposes `homeManagerModules.default` (alias
+`homeManagerModules.gribe`), which installs the package. As a Claude Code skill
+can't be activated from a Nix profile, only from `~/.claude/skills/`, the flake
+also supports linking gribe's embedded skill there. It also allows managing the
+gribe config settings.
 
 ```nix
 # flake.nix inputs: cookbook.url = "github:jkeifer/homebrew-cookbook";
@@ -45,25 +47,28 @@ Nix profile, only from `~/.claude/skills/` — links gribe's embedded skill ther
 imports = [ inputs.cookbook.homeManagerModules.default ];
 
 programs.gribe.enable = true;
-# programs.gribe.installSkill = false;   # opt out of ~/.claude/skills/transgribe/SKILL.md
-# programs.gribe.package = ...;          # override the package
+# install ~/.claude/skills/transgribe/SKILL.md for claude code (default false)
+# programs.gribe.installSkill = true;
+# override the package
+# programs.gribe.package = ...;
 
 # Declaratively manage ~/.config/transgribe/config:
 programs.gribe.settings = {
   default-model = "parakeet-v3";
-  default-language = "en";
+  default-language = "en-US";
   default-include-markup = false;
 };
 ```
 
-Setting `settings` makes home-manager own `~/.config/transgribe/config` (a read-only
-store symlink), so `gribe config set`/`unset` will fail — manage it here, or leave
-`settings` empty to keep using `gribe config` imperatively. See `gribe config keys` for
-valid keys/values (Nix does not validate them). Note: `settings` only takes effect on a
-gribe release that includes the `config` command.
+Setting `settings` makes home-manager own `~/.config/transgribe/config` (a
+read-only store symlink), so `gribe config set`/`unset` will fail — manage it
+here, or leave `settings` empty to keep using `gribe config` imperatively. See
+`gribe config keys` for valid keys/values (Nix does not validate them). Note:
+`settings` only takes effect on a gribe release that includes the `config`
+command.
 
-Without home-manager, the skill still ships inside the binary — run `gribe skill install`
-to place it imperatively. The package also exposes it at
+Without home-manager, the skill still ships inside the binary — run `gribe
+skill install` to place it imperatively. The package also exposes it at
 `<gribe>/share/transgribe/SKILL.md`.
 
 ### Browser downloads
